@@ -26,6 +26,27 @@
   --mono: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
 }
 
+:root.light {
+  --bg: #f5f5f5;
+  --surface: rgba(0,0,0,0.03);
+  --surface-hover: rgba(0,0,0,0.06);
+  --surface-active: rgba(0,0,0,0.09);
+  --elevated: #fff;
+  --input: rgba(0,0,0,0.04);
+  --text: #1a1a1a;
+  --text-2: #666;
+  --text-3: #999;
+  --accent: #4f6eea;
+  --accent-hover: #3d5bd6;
+  --accent-glow: rgba(79,110,234,0.10);
+  --accent-text: #4f6eea;
+  --green: #10b981;
+  --red: #ef4444;
+  --border: rgba(0,0,0,0.08);
+  --border-light: rgba(0,0,0,0.04);
+  --shadow: 0 2px 20px rgba(0,0,0,0.08);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; }
 
@@ -88,13 +109,13 @@ select {
 .word-tooltip {
   position: fixed;
   z-index: 1000;
-  background: #2a2a2a;
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--elevated);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 14px;
   max-width: 340px;
   min-width: 180px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow);
   backdrop-filter: blur(20px);
   font-size: 12px;
   animation: tip-in 0.12s ease;
@@ -153,8 +174,8 @@ select {
 @keyframes overlay-in { from { opacity: 0; } }
 
 .dialog {
-  background: #2a2a2a;
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--elevated);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 24px;
   min-width: 440px;

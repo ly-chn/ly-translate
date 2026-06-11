@@ -6,8 +6,6 @@ mod dict;
 mod translate_mod;
 mod tray;
 
-use tauri::Manager;
-
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(
@@ -17,15 +15,8 @@ fn main() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
-            if let Some(win) = app.get_webview_window("main") {
-                if let Ok(Some(monitor)) = win.current_monitor() {
-                    let size = monitor.size();
-                    let w = (size.width as f64 * 0.5) as u32;
-                    let h = (size.height as f64 * 0.5) as u32;
-                    let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(w, h)));
-                    let _ = win.center();
-                }
-            }
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -31,6 +31,7 @@ pub fn setup(app: &AppHandle) -> anyhow::Result<()> {
 
     let _tray = TrayIconBuilder::new()
         .icon(app.default_window_icon().unwrap().clone())
+        .show_menu_on_left_click(false)
         .menu(&menu)
         .on_tray_icon_event(|tray, event| {
             if let tauri::tray::TrayIconEvent::Click {

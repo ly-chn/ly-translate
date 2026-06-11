@@ -30,6 +30,8 @@ pub struct AppSettings {
     pub always_on_top: bool,
     #[serde(rename = "autoStart", default)]
     pub auto_start: bool,
+    #[serde(rename = "darkMode", default)]
+    pub dark_mode: Option<bool>,
 }
 
 fn default_languages() -> Vec<String> {
@@ -51,6 +53,7 @@ impl Default for AppSettings {
             enabled_languages: default_languages(),
             always_on_top: false,
             auto_start: false,
+            dark_mode: None,
         }
     }
 }

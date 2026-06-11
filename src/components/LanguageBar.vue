@@ -19,6 +19,8 @@ const emit = defineEmits<{
 
 const store = useSettingsStore();
 
+const effectiveDark = computed(() => store.settings.darkMode ?? window.matchMedia("(prefers-color-scheme: dark)").matches);
+
 const enabledLanguages = computed(() => {
   const codes = store.settings.enabledLanguages;
   return ALL_LANGUAGES.filter((l) => l.code === "auto" || codes.includes(l.code));
@@ -77,6 +79,16 @@ function swap() {
         @click="emit('update:style', opt.value)"
       >{{ opt.label }}</button>
     </div>
+
+    <button class="btn-ghost gear" @click="store.toggleDarkMode()" :title="effectiveDark ? '日间模式' : '夜间模式'">
+      <svg v-if="effectiveDark" width="15" height="15" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none">
+        <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
 
     <button class="btn-ghost gear" @click="emit('openSettings')" title="设置">
       <svg width="15" height="15" viewBox="0 0 20 20" fill="none">

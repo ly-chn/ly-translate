@@ -23,6 +23,7 @@ export interface AppSettings {
   enabledLanguages: string[];
   alwaysOnTop: boolean;
   autoStart: boolean;
+  darkMode?: boolean;
 }
 
 export interface WordDefinition {

@@ -20,6 +20,17 @@ export const useSettingsStore = defineStore("settings", () => {
   const style = ref<TranslationStyle>("professional_ecommerce");
   const settingsLoaded = ref(false);
 
+  const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+  systemDark.addEventListener("change", () => {
+    if (settings.value.darkMode === undefined) applyTheme();
+  });
+
+  function applyTheme() {
+    const isDark =
+      settings.value.darkMode ?? systemDark.matches;
+    document.documentElement.classList.toggle("light", !isDark);
+  }
+
   async function load() {
     try {
       const saved = await invoke<AppSettings | null>("load_settings");
@@ -34,6 +45,7 @@ export const useSettingsStore = defineStore("settings", () => {
       console.error("Failed to load settings:", e);
     }
     settingsLoaded.value = true;
+    applyTheme();
   }
 
   async function save() {
@@ -45,6 +57,12 @@ export const useSettingsStore = defineStore("settings", () => {
   }
 
   watch(settings, save, { deep: true });
+  watch(() => settings.value.darkMode, applyTheme);
 
-  return { settings, style, settingsLoaded, load, save };
+  function toggleDarkMode() {
+    const effective = settings.value.darkMode ?? systemDark.matches;
+    settings.value.darkMode = !effective;
+  }
+
+  return { settings, style, settingsLoaded, load, save, toggleDarkMode };
 });
