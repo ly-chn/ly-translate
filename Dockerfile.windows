@@ -1,0 +1,28 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN apt-get update && apt-get install -y \
+    curl wget unzip file \
+    build-essential pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js 22
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs
+
+# Rust + Windows cross-compile
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    rustup target add x86_64-pc-windows-msvc && \
+    cargo install cargo-xwin
+
+WORKDIR /app
+COPY . .
+
+# Frontend
+RUN npm ci && npm run build
+
+# Cross-compile for Windows
+RUN cd src-tauri && \
+    cargo xwin build --release --target x86_64-pc-windows-msvc
