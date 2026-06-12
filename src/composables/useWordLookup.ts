@@ -13,6 +13,7 @@ export function useWordLookup() {
 
   let hideTimer: ReturnType<typeof setTimeout> | null = null;
   let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+  let lookupGen = 0;
   let lastWord = "";
 
   function showTooltip(x: number, y: number) {
@@ -21,8 +22,20 @@ export function useWordLookup() {
     hideTimer && clearTimeout(hideTimer);
   }
 
+  function hide(delay = 150) {
+    hoverTimer && clearTimeout(hoverTimer);
+    hoverTimer = null;
+    lookupGen++;
+    hideTimer = setTimeout(() => {
+      visible.value = false;
+      definition.value = null;
+      translationText.value = "";
+      lastWord = "";
+    }, delay);
+  }
+
   // Hover word lookup (with delay)
-  function lookup(word: string, lang: string, x: number, y: number, delay = 200) {
+  function lookup(word: string, lang: string, x: number, y: number, delay = 300) {
     const w = word.trim();
     if (!w || w.length < 2) return;
     if (w === lastWord && visible.value && mode.value === "definition") {
@@ -34,6 +47,7 @@ export function useWordLookup() {
     hideTimer && clearTimeout(hideTimer);
 
     hoverTimer = setTimeout(async () => {
+      const gen = ++lookupGen;
       lastWord = w;
       showTooltip(x, y);
       mode.value = "loading";
@@ -41,9 +55,11 @@ export function useWordLookup() {
 
       try {
         const result = await invoke<WordDefinition>("lookup_word", { word: w, lang });
+        if (gen !== lookupGen) return;
         definition.value = result;
         mode.value = "definition";
       } catch {
+        if (gen !== lookupGen) return;
         definition.value = {
           word: w, phonetic: "",
           definitions: [{ pos: "", meaning: "查询失败" }],
@@ -62,6 +78,7 @@ export function useWordLookup() {
     hoverTimer && clearTimeout(hoverTimer);
     hideTimer && clearTimeout(hideTimer);
     lastWord = "";
+    const gen = ++lookupGen;
 
     showTooltip(x, y);
     mode.value = "loading";
@@ -69,22 +86,14 @@ export function useWordLookup() {
 
     try {
       const result = await invoke<string>("translate", { text: t, from, to, style: "general" });
+      if (gen !== lookupGen) return;
       translationText.value = result;
       mode.value = "translation";
     } catch {
+      if (gen !== lookupGen) return;
       translationText.value = "翻译失败";
       mode.value = "translation";
     }
-  }
-
-  function hide(delay = 200) {
-    hoverTimer && clearTimeout(hoverTimer);
-    hideTimer = setTimeout(() => {
-      visible.value = false;
-      definition.value = null;
-      translationText.value = "";
-      lastWord = "";
-    }, delay);
   }
 
   function keepVisible() {

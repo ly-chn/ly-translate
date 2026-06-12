@@ -58,9 +58,9 @@ let lastHoverWord = "";
 
 function onOutputMouseMove(e: MouseEvent) {
   const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
-  if (!range) return;
+  if (!range) { wordLookup.hide(); return; }
   const node = range.startContainer;
-  if (node.nodeType !== Node.TEXT_NODE) return;
+  if (node.nodeType !== Node.TEXT_NODE) { wordLookup.hide(); return; }
   const text = node.textContent || "";
   let start = range.startOffset;
   let end = start;
@@ -70,6 +70,9 @@ function onOutputMouseMove(e: MouseEvent) {
   if (word.length >= 2 && word !== lastHoverWord) {
     lastHoverWord = word;
     wordLookup.lookup(word, props.targetLang, e.clientX, e.clientY);
+  } else if (word.length < 2) {
+    lastHoverWord = "";
+    wordLookup.hide();
   }
 }
 
