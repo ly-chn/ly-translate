@@ -45,7 +45,6 @@ watch(
   }
 );
 
-// ── Source: selection → quick translate ──
 function onSourceSelect(e: MouseEvent) {
   const sel = window.getSelection()?.toString().trim();
   if (sel && sel.length >= 2) {
@@ -53,40 +52,12 @@ function onSourceSelect(e: MouseEvent) {
   }
 }
 
-// ── Output: hover word lookup ──
-let lastHoverWord = "";
-
-function onOutputMouseMove(e: MouseEvent) {
-  const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
-  if (!range) { wordLookup.hide(); return; }
-  const node = range.startContainer;
-  if (node.nodeType !== Node.TEXT_NODE) { wordLookup.hide(); return; }
-  const text = node.textContent || "";
-  let start = range.startOffset;
-  let end = start;
-  while (start > 0 && /\w/.test(text[start - 1])) start--;
-  while (end < text.length && /\w/.test(text[end])) end++;
-  const word = text.slice(start, end).trim();
-  if (word.length >= 2 && word !== lastHoverWord) {
-    lastHoverWord = word;
-    wordLookup.lookup(word, props.targetLang, e.clientX, e.clientY);
-  } else if (word.length < 2) {
-    lastHoverWord = "";
-    wordLookup.hide();
-  }
-}
-
-// ── Output: selection → quick translate ──
 function onOutputMouseUp(e: MouseEvent) {
   const sel = window.getSelection()?.toString().trim();
   if (sel && sel.length >= 2) {
-    wordLookup.quickTranslate(sel, props.targetLang, props.sourceLang, e.clientX, e.clientY);
+    const reverseTo = props.sourceLang === "auto" ? "zh" : props.sourceLang;
+    wordLookup.quickTranslate(sel, props.targetLang, reverseTo, e.clientX, e.clientY);
   }
-}
-
-function onOutputMouseLeave() {
-  lastHoverWord = "";
-  wordLookup.hide();
 }
 
 onUnmounted(() => { debounceTimer && clearTimeout(debounceTimer); });
@@ -121,8 +92,6 @@ onUnmounted(() => { debounceTimer && clearTimeout(debounceTimer); });
       </div>
       <div
         class="output"
-        @mousemove="onOutputMouseMove"
-        @mouseleave="onOutputMouseLeave"
         @mouseup="onOutputMouseUp"
       >
         <pre v-if="translatedText">{{ translatedText }}</pre>
