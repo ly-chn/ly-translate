@@ -21,18 +21,13 @@ export function useTranslation() {
 
     const id = ++requestId;
     isTranslating.value = true;
-
     try {
-      const result = await invoke<string>("translate", {
-        text,
-        from,
-        to,
-        style,
-      });
+      const result = await invoke<string>("translate", { text, from, to, style });
       if (id !== requestId) return;
       translatedText.value = result;
     } catch (e: unknown) {
       if (id !== requestId) return;
+      if (e === "cancelled") return;
       translatedText.value = `翻译失败: ${e}`;
     } finally {
       if (id === requestId) {

@@ -52,7 +52,9 @@ pub async fn translate(
     to: &str,
     style: &str,
     config: &ModelConfig,
-) -> Result<String> {
+    seq: u64,
+    mut cancel_rx: tokio::sync::watch::Receiver<u64>,
+) -> Result<Option<String>> {
     let system = format!(
         "{} 只输出翻译结果，不要解释、不要加引号。",
         style_prompt(style)
@@ -73,12 +75,23 @@ pub async fn translate(
     );
     let start = Instant::now();
 
-    let result = match config.provider.as_str() {
-        "anthropic" => call_anthropic(config, &system, &user_msg, 2048).await,
-        _ => call_openai(config, &system, &user_msg, 2048).await,
+    let http_fut: std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send>> =
+        match config.provider.as_str() {
+            "anthropic" => Box::pin(call_anthropic(config, &system, &user_msg, 2048)),
+            _ => Box::pin(call_openai(config, &system, &user_msg, 2048)),
+        };
+
+    let result = tokio::select! {
+        r = http_fut => r.map(Some),
+        _ = cancel_rx.wait_for(|&v| v > seq) => {
+            println!("[translate] cancelled (seq {})", seq);
+            Ok(None)
+        }
     };
 
-    println!("[translate] done: {}ms", start.elapsed().as_millis());
+    if result.as_ref().ok().and_then(|o| o.as_ref()).is_some() {
+        println!("[translate] done: {}ms", start.elapsed().as_millis());
+    }
     result
 }
 

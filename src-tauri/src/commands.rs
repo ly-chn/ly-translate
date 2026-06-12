@@ -5,6 +5,27 @@ use crate::config::AppSettings;
 use crate::dict::{self, WordDefinition};
 use crate::translate_mod;
 
+pub struct TranslateState {
+    pub cancel: tokio::sync::watch::Sender<u64>,
+    seq: std::sync::atomic::AtomicU64,
+}
+
+impl TranslateState {
+    pub fn new() -> Self {
+        let (tx, _) = tokio::sync::watch::channel(0);
+        Self {
+            cancel: tx,
+            seq: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    pub fn next(&self) -> (u64, tokio::sync::watch::Receiver<u64>) {
+        let seq = self.seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        let _ = self.cancel.send(seq);
+        (seq, self.cancel.subscribe())
+    }
+}
+
 fn get_config(app: &AppHandle) -> AppSettings {
     load_settings_inner(app).unwrap_or_default()
 }
@@ -29,9 +50,15 @@ pub async fn translate(
     style: String,
 ) -> Result<String, String> {
     let config = get_config(&app);
-    translate_mod::translate(&text, &from, &to, &style, &config.model)
-        .await
-        .map_err(|e| e.to_string())
+    let state = app.state::<TranslateState>();
+    let (seq, cancel_rx) = state.next();
+    let result = translate_mod::translate(&text, &from, &to, &style, &config.model, seq, cancel_rx)
+        .await;
+    match result {
+        Ok(Some(r)) => Ok(r),
+        Ok(None) => Err("cancelled".into()),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 #[tauri::command]
