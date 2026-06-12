@@ -14,8 +14,8 @@ const props = defineProps<{
 defineEmits(["mouseenter", "mouseleave"]);
 
 const style = computed(() => ({
-  left: Math.min(props.pos.x + 14, window.innerWidth - 360) + "px",
-  top: Math.min(props.pos.y + 18, window.innerHeight - 260) + "px",
+  left: Math.min(props.pos.x + 14, window.innerWidth - 400) + "px",
+  top: Math.min(props.pos.y + 18, window.innerHeight - 320) + "px",
 }));
 </script>
 
@@ -57,9 +57,11 @@ const style = computed(() => ({
 <style scoped>
 .tooltip-translation {
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--text);
-  max-width: 320px;
+  max-width: 380px;
+  max-height: 300px;
+  overflow-y: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
 }

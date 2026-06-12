@@ -123,6 +123,7 @@ onUnmounted(() => { debounceTimer && clearTimeout(debounceTimer); });
 .pane-head {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 20px; height: 32px; flex-shrink: 0;
+  user-select: none; -webkit-user-select: none;
 }
 .pane-label {
   font-size: 11px; font-weight: 600; color: var(--text-3);
