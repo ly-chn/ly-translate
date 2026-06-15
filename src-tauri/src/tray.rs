@@ -45,6 +45,7 @@ pub fn setup(app: &AppHandle) -> anyhow::Result<()> {
                     if win.is_visible().unwrap_or(false) {
                         let _ = win.hide();
                     } else {
+                        let _ = win.unminimize();
                         let _ = win.show();
                         let _ = win.set_focus();
                     }
