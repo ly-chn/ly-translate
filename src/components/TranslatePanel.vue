@@ -55,17 +55,12 @@ watch(
 
 function onSourceSelect(e: MouseEvent) {
   const sel = window.getSelection()?.toString().trim();
-  if (sel && sel.length >= 2) {
-    wordLookup.quickTranslate(sel, props.sourceLang, props.targetLang, e.clientX, e.clientY);
-  }
+  if (sel) wordLookup.lookupSelection(sel, e.clientX, e.clientY);
 }
 
 function onOutputMouseUp(e: MouseEvent) {
   const sel = window.getSelection()?.toString().trim();
-  if (sel && sel.length >= 2) {
-    const reverseTo = props.sourceLang === "auto" ? "zh" : props.sourceLang;
-    wordLookup.quickTranslate(sel, props.targetLang, reverseTo, e.clientX, e.clientY);
-  }
+  if (sel) wordLookup.lookupSelection(sel, e.clientX, e.clientY);
 }
 
 onUnmounted(() => { debounceTimer && clearTimeout(debounceTimer); });
@@ -125,7 +120,6 @@ onUnmounted(() => { debounceTimer && clearTimeout(debounceTimer); });
 
   <WordTooltip
     :definition="wordLookup.definition.value"
-    :translation="wordLookup.translationText.value"
     :mode="wordLookup.mode.value"
     :pos="wordLookup.tooltipPos.value"
     :visible="wordLookup.visible.value"

@@ -2,11 +2,10 @@ import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { WordDefinition } from "../types";
 
-export type TooltipMode = "definition" | "translation" | "loading";
+export type TooltipMode = "definition" | "loading";
 
 export function useWordLookup() {
   const definition = ref<WordDefinition | null>(null);
-  const translationText = ref("");
   const mode = ref<TooltipMode>("loading");
   const tooltipPos = ref({ x: 0, y: 0 });
   const visible = ref(false);
@@ -29,15 +28,58 @@ export function useWordLookup() {
     hideTimer = setTimeout(() => {
       visible.value = false;
       definition.value = null;
-      translationText.value = "";
       lastWord = "";
     }, delay);
   }
 
-  // Hover word lookup (with delay)
+  function detectLang(text: string): string {
+    const zh = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+    return zh >= Math.max(1, text.length / 4) ? "zh" : "en";
+  }
+
+  function worthLookup(text: string): boolean {
+    const t = text.trim();
+    if (!t) return false;
+    // 词典适合词/短语，过长当句子跳过
+    if (t.length > 40) return false;
+    if (/[\u4e00-\u9fff]/.test(t)) return t.length >= 1;
+    return t.length >= 2;
+  }
+
+  async function doLookup(word: string, lang: string, x: number, y: number) {
+    const w = word.trim();
+    if (!worthLookup(w)) return;
+
+    hoverTimer && clearTimeout(hoverTimer);
+    hideTimer && clearTimeout(hideTimer);
+
+    const gen = ++lookupGen;
+    lastWord = w;
+    showTooltip(x, y);
+    mode.value = "loading";
+    definition.value = null;
+
+    try {
+      const result = await invoke<WordDefinition>("lookup_word", { word: w, lang });
+      if (gen !== lookupGen) return;
+      definition.value = result;
+      mode.value = "definition";
+    } catch {
+      if (gen !== lookupGen) return;
+      definition.value = {
+        word: w,
+        phonetic: "",
+        definitions: [{ pos: "", meaning: "未找到词条" }],
+        examples: [],
+      };
+      mode.value = "definition";
+    }
+  }
+
+  /** 悬停查词（带延迟） */
   function lookup(word: string, lang: string, x: number, y: number, delay = 300) {
     const w = word.trim();
-    if (!w || w.length < 2) return;
+    if (!worthLookup(w)) return;
     if (w === lastWord && visible.value && mode.value === "definition") {
       tooltipPos.value = { x, y };
       return;
@@ -46,60 +88,16 @@ export function useWordLookup() {
     hoverTimer && clearTimeout(hoverTimer);
     hideTimer && clearTimeout(hideTimer);
 
-    hoverTimer = setTimeout(async () => {
-      const gen = ++lookupGen;
-      lastWord = w;
-      showTooltip(x, y);
-      mode.value = "loading";
-      definition.value = null;
-
-      try {
-        const result = await invoke<WordDefinition>("lookup_word", { word: w, lang });
-        if (gen !== lookupGen) return;
-        definition.value = result;
-        mode.value = "definition";
-      } catch {
-        if (gen !== lookupGen) return;
-        definition.value = {
-          word: w, phonetic: "",
-          definitions: [{ pos: "", meaning: "查询失败" }],
-          examples: [],
-        };
-        mode.value = "definition";
-      }
+    hoverTimer = setTimeout(() => {
+      doLookup(w, lang || detectLang(w), x, y);
     }, delay);
   }
 
-  // Selection: immediate translate
-  async function quickTranslate(text: string, from: string, to: string, x: number, y: number) {
+  /** 选中查词（立即） */
+  function lookupSelection(text: string, x: number, y: number) {
     const t = text.trim();
-    if (!t || t.length < 2) return;
-
-    hoverTimer && clearTimeout(hoverTimer);
-    hideTimer && clearTimeout(hideTimer);
-    lastWord = "";
-    const gen = ++lookupGen;
-
-    showTooltip(x, y);
-    mode.value = "loading";
-    translationText.value = "";
-
-    try {
-      const result = await invoke<string>("translate", {
-        text: t,
-        from,
-        to,
-        style: "selection",
-        id: 0,
-      });
-      if (gen !== lookupGen) return;
-      translationText.value = result;
-      mode.value = "translation";
-    } catch {
-      if (gen !== lookupGen) return;
-      translationText.value = "翻译失败";
-      mode.value = "translation";
-    }
+    if (!worthLookup(t)) return;
+    doLookup(t, detectLang(t), x, y);
   }
 
   function keepVisible() {
@@ -107,7 +105,13 @@ export function useWordLookup() {
   }
 
   return {
-    definition, translationText, mode, tooltipPos, visible,
-    lookup, quickTranslate, hide, keepVisible,
+    definition,
+    mode,
+    tooltipPos,
+    visible,
+    lookup,
+    lookupSelection,
+    hide,
+    keepVisible,
   };
 }

@@ -29,6 +29,10 @@ export interface AppSettings {
 export interface WordDefinition {
   word: string;
   phonetic: string;
+  ukPhonetic?: string;
+  usPhonetic?: string;
+  ukSpeech?: string;
+  usSpeech?: string;
   definitions: { pos: string; meaning: string }[];
   examples: string[];
 }
