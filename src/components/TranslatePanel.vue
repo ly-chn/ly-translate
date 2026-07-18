@@ -15,6 +15,7 @@ const {
   translatedText,
   isTranslating,
   translate,
+  clear,
 } = useTranslation();
 
 const wordLookup = useWordLookup();
@@ -30,6 +31,13 @@ function doTranslate() {
       translatedText.value = "";
     }
   }, 500);
+}
+
+function clearAll() {
+  debounceTimer && clearTimeout(debounceTimer);
+  debounceTimer = null;
+  wordLookup.hide();
+  clear();
 }
 
 function onCompositionStart() { composing = true; }
@@ -70,6 +78,17 @@ onUnmounted(() => { debounceTimer && clearTimeout(debounceTimer); });
       <div class="pane-head">
         <span class="pane-label">原文</span>
         <span class="char-count" v-if="sourceText">{{ sourceText.length }}</span>
+        <button
+          v-if="sourceText || translatedText"
+          class="clear-btn"
+          title="清空"
+          @click="clearAll"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          清空
+        </button>
       </div>
       <textarea
         v-model="sourceText"
@@ -122,7 +141,7 @@ onUnmounted(() => { debounceTimer && clearTimeout(debounceTimer); });
 
 .pane-head {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 20px; height: 32px; flex-shrink: 0;
+  padding: 6px 12px 6px 20px; height: 32px; flex-shrink: 0;
   user-select: none; -webkit-user-select: none;
 }
 .pane-label {
@@ -132,6 +151,21 @@ onUnmounted(() => { debounceTimer && clearTimeout(debounceTimer); });
 .char-count {
   font-size: 10px; color: var(--text-3); opacity: 0.6;
   font-family: var(--mono);
+}
+.clear-btn {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 4px;
+  height: 24px; padding: 0 10px; border-radius: 6px;
+  font-size: 12px; font-weight: 500;
+  color: var(--accent-text);
+  background: var(--accent-glow);
+  border: 1px solid rgba(110, 142, 251, 0.22);
+  transition: all var(--transition);
+}
+.clear-btn:hover {
+  color: #fff;
+  background: var(--accent);
+  border-color: transparent;
 }
 .status-dot {
   width: 5px; height: 5px; border-radius: 50%;

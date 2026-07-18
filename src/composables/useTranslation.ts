@@ -36,5 +36,12 @@ export function useTranslation() {
     }
   }
 
-  return { sourceText, translatedText, isTranslating, translate };
+  function clear() {
+    requestId++;
+    sourceText.value = "";
+    translatedText.value = "";
+    isTranslating.value = false;
+  }
+
+  return { sourceText, translatedText, isTranslating, translate, clear };
 }
