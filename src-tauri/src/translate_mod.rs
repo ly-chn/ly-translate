@@ -1,6 +1,8 @@
 use anyhow::Result;
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::time::Instant;
+use tauri::{AppHandle, Emitter};
 
 use crate::config::ModelConfig;
 
@@ -11,6 +13,24 @@ static CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|
         .build()
         .unwrap()
 });
+
+#[derive(Clone, Serialize)]
+pub struct TranslateChunkEvent {
+    pub id: u64,
+    pub delta: String,
+    pub done: bool,
+}
+
+fn emit_chunk(app: &AppHandle, id: u64, delta: &str, done: bool) {
+    let _ = app.emit(
+        "translate-chunk",
+        TranslateChunkEvent {
+            id,
+            delta: delta.to_string(),
+            done,
+        },
+    );
+}
 
 fn style_prompt(style: &str) -> &str {
     match style {
@@ -54,6 +74,8 @@ pub async fn translate(
     config: &ModelConfig,
     seq: u64,
     mut cancel_rx: tokio::sync::watch::Receiver<u64>,
+    app: &AppHandle,
+    id: u64,
 ) -> Result<Option<String>> {
     let system = format!(
         "{} 只输出翻译结果，不要解释、不要加引号。",
@@ -67,34 +89,35 @@ pub async fn translate(
     let user_msg = format!("将以下{}文本翻译为{}：\n\n{}", src, tgt, text);
 
     println!(
-        "[translate] {} {}->{} ({} chars)",
+        "[translate] {} {}->{} ({} chars) stream id={}",
         style,
         from,
         to,
-        text.len()
+        text.len(),
+        id
     );
     let start = Instant::now();
 
-    let http_fut: std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send>> =
-        match config.provider.as_str() {
-            "anthropic" => Box::pin(call_anthropic(config, &system, &user_msg, 2048)),
-            _ => Box::pin(call_openai(config, &system, &user_msg, 2048)),
-        };
-
-    let result = tokio::select! {
-        r = http_fut => r.map(Some),
-        _ = cancel_rx.wait_for(|&v| v > seq) => {
-            println!("[translate] cancelled (seq {})", seq);
-            Ok(None)
+    let result = match config.provider.as_str() {
+        "anthropic" => {
+            call_anthropic_stream(config, &system, &user_msg, 2048, app, id, seq, &mut cancel_rx)
+                .await
+        }
+        _ => {
+            call_openai_stream(config, &system, &user_msg, 2048, app, id, seq, &mut cancel_rx)
+                .await
         }
     };
 
-    if result.as_ref().ok().and_then(|o| o.as_ref()).is_some() {
-        println!("[translate] done: {}ms", start.elapsed().as_millis());
+    match &result {
+        Ok(Some(_)) => println!("[translate] done: {}ms", start.elapsed().as_millis()),
+        Ok(None) => println!("[translate] cancelled (seq {})", seq),
+        Err(e) => println!("[translate] error: {e}"),
     }
     result
 }
 
+/// Non-streaming helpers (dict lookup etc.)
 pub async fn call_openai(
     config: &ModelConfig,
     system: &str,
@@ -166,4 +189,192 @@ pub async fn call_anthropic(
         .as_str()
         .unwrap_or("")
         .to_string())
+}
+
+async fn call_openai_stream(
+    config: &ModelConfig,
+    system: &str,
+    user: &str,
+    max_tokens: u32,
+    app: &AppHandle,
+    id: u64,
+    seq: u64,
+    cancel_rx: &mut tokio::sync::watch::Receiver<u64>,
+) -> Result<Option<String>> {
+    let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
+    let body = json!({
+        "model": config.model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user}
+        ],
+        "temperature": 0.1,
+        "max_tokens": max_tokens,
+        "stream": true,
+    });
+
+    let resp = CLIENT
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", config.api_key))
+        .header("Accept", "text/event-stream")
+        .json(&body)
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let err = resp.text().await.unwrap_or_default();
+        anyhow::bail!("API error {}: {}", status, err);
+    }
+
+    read_openai_sse(resp, app, id, seq, cancel_rx).await
+}
+
+async fn call_anthropic_stream(
+    config: &ModelConfig,
+    system: &str,
+    user: &str,
+    max_tokens: u32,
+    app: &AppHandle,
+    id: u64,
+    seq: u64,
+    cancel_rx: &mut tokio::sync::watch::Receiver<u64>,
+) -> Result<Option<String>> {
+    let url = format!("{}/messages", config.base_url.trim_end_matches('/'));
+    let body = json!({
+        "model": config.model,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+        "stream": true,
+    });
+
+    let resp = CLIENT
+        .post(&url)
+        .header("x-api-key", &config.api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .header("Accept", "text/event-stream")
+        .json(&body)
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let err = resp.text().await.unwrap_or_default();
+        anyhow::bail!("API error {}: {}", status, err);
+    }
+
+    read_anthropic_sse(resp, app, id, seq, cancel_rx).await
+}
+
+async fn read_openai_sse(
+    mut resp: reqwest::Response,
+    app: &AppHandle,
+    id: u64,
+    seq: u64,
+    cancel_rx: &mut tokio::sync::watch::Receiver<u64>,
+) -> Result<Option<String>> {
+    let mut buf = String::new();
+    let mut full = String::new();
+
+    loop {
+        tokio::select! {
+            biased;
+            _ = cancel_rx.wait_for(|&v| v > seq) => {
+                return Ok(None);
+            }
+            chunk = resp.chunk() => {
+                let Some(bytes) = chunk? else { break; };
+                buf.push_str(&String::from_utf8_lossy(&bytes));
+                while let Some(pos) = buf.find('\n') {
+                    let line = buf[..pos].trim_end_matches('\r').to_string();
+                    buf.drain(..=pos);
+                    if line.is_empty() {
+                        continue;
+                    }
+                    let Some(data) = line.strip_prefix("data:") else {
+                        continue;
+                    };
+                    let data = data.trim();
+                    if data.is_empty() {
+                        continue;
+                    }
+                    if data == "[DONE]" {
+                        emit_chunk(app, id, "", true);
+                        return Ok(Some(full));
+                    }
+                    if let Ok(v) = serde_json::from_str::<Value>(data) {
+                        if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
+                            if !delta.is_empty() {
+                                full.push_str(delta);
+                                emit_chunk(app, id, delta, false);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    emit_chunk(app, id, "", true);
+    Ok(Some(full))
+}
+
+async fn read_anthropic_sse(
+    mut resp: reqwest::Response,
+    app: &AppHandle,
+    id: u64,
+    seq: u64,
+    cancel_rx: &mut tokio::sync::watch::Receiver<u64>,
+) -> Result<Option<String>> {
+    let mut buf = String::new();
+    let mut full = String::new();
+
+    loop {
+        tokio::select! {
+            biased;
+            _ = cancel_rx.wait_for(|&v| v > seq) => {
+                return Ok(None);
+            }
+            chunk = resp.chunk() => {
+                let Some(bytes) = chunk? else { break; };
+                buf.push_str(&String::from_utf8_lossy(&bytes));
+                while let Some(pos) = buf.find('\n') {
+                    let line = buf[..pos].trim_end_matches('\r').to_string();
+                    buf.drain(..=pos);
+                    if line.is_empty() || line.starts_with("event:") {
+                        continue;
+                    }
+                    let Some(data) = line.strip_prefix("data:") else {
+                        continue;
+                    };
+                    let data = data.trim();
+                    if data.is_empty() {
+                        continue;
+                    }
+                    if let Ok(v) = serde_json::from_str::<Value>(data) {
+                        match v["type"].as_str() {
+                            Some("content_block_delta") => {
+                                if let Some(delta) = v["delta"]["text"].as_str() {
+                                    if !delta.is_empty() {
+                                        full.push_str(delta);
+                                        emit_chunk(app, id, delta, false);
+                                    }
+                                }
+                            }
+                            Some("message_stop") => {
+                                emit_chunk(app, id, "", true);
+                                return Ok(Some(full));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    emit_chunk(app, id, "", true);
+    Ok(Some(full))
 }

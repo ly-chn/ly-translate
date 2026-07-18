@@ -48,12 +48,23 @@ pub async fn translate(
     from: String,
     to: String,
     style: String,
+    id: u64,
 ) -> Result<String, String> {
     let config = get_config(&app);
     let state = app.state::<TranslateState>();
     let (seq, cancel_rx) = state.next();
-    let result = translate_mod::translate(&text, &from, &to, &style, &config.model, seq, cancel_rx)
-        .await;
+    let result = translate_mod::translate(
+        &text,
+        &from,
+        &to,
+        &style,
+        &config.model,
+        seq,
+        cancel_rx,
+        &app,
+        id,
+    )
+    .await;
     match result {
         Ok(Some(r)) => Ok(r),
         Ok(None) => Err("cancelled".into()),

@@ -85,7 +85,13 @@ export function useWordLookup() {
     translationText.value = "";
 
     try {
-      const result = await invoke<string>("translate", { text: t, from, to, style: "selection" });
+      const result = await invoke<string>("translate", {
+        text: t,
+        from,
+        to,
+        style: "selection",
+        id: 0,
+      });
       if (gen !== lookupGen) return;
       translationText.value = result;
       mode.value = "translation";
