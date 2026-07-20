@@ -105,58 +105,10 @@ select {
   padding-right: 24px;
 }
 
-/* ── Tooltip ── */
+/* ── Tooltip shell (legacy hooks; card styles live in WordTooltip.vue) ── */
 .word-tooltip {
   position: fixed;
   z-index: 1000;
-  background: var(--elevated);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 14px;
-  max-width: 400px;
-  min-width: 180px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(20px);
-  font-size: 12px;
-  animation: tip-in 0.12s ease;
-}
-@keyframes tip-in {
-  from { opacity: 0; transform: translateY(3px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-.tooltip-word {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--accent-text);
-  margin-bottom: 2px;
-  letter-spacing: -0.01em;
-}
-.tooltip-phonetic {
-  color: var(--text-3);
-  font-size: 12px;
-  font-family: var(--mono);
-  margin-bottom: 6px;
-}
-.tooltip-def { margin-bottom: 3px; line-height: 1.4; }
-.tooltip-pos {
-  display: inline-block;
-  background: var(--accent-glow);
-  color: var(--accent-text);
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 500;
-  margin-right: 5px;
-  letter-spacing: 0.02em;
-}
-.tooltip-example {
-  color: var(--text-2);
-  font-size: 12px;
-  font-style: italic;
-  padding-left: 8px;
-  border-left: 2px solid rgba(255,255,255,0.06);
-  margin-top: 5px;
-  line-height: 1.4;
 }
 
 /* ── Dialog ── */

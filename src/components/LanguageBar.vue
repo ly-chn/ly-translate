@@ -110,6 +110,9 @@ function swap() {
   border-bottom: 1px solid var(--border-light);
   user-select: none;
   -webkit-app-region: drag;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
 }
 .toolbar select, .toolbar button { -webkit-app-region: no-drag; }
 
