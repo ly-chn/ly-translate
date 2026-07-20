@@ -2,6 +2,7 @@
 import { watch, onUnmounted } from "vue";
 import { useTranslation } from "../composables/useTranslation";
 import { useWordLookup } from "../composables/useWordLookup";
+import { resolveTranslatePair } from "../composables/detectLang";
 import WordTooltip from "./WordTooltip.vue";
 
 const props = defineProps<{
@@ -22,11 +23,16 @@ const wordLookup = useWordLookup();
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let composing = false;
 
+function runTranslate(text: string) {
+  const { from, to } = resolveTranslatePair(text, props.sourceLang, props.targetLang);
+  translate(text, from, to, props.style);
+}
+
 function doTranslate() {
   debounceTimer && clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     if (sourceText.value.trim()) {
-      translate(sourceText.value, props.sourceLang, props.targetLang, props.style);
+      runTranslate(sourceText.value);
     } else {
       translatedText.value = "";
     }
@@ -48,7 +54,7 @@ watch(
   () => [props.sourceLang, props.targetLang, props.style],
   () => {
     if (sourceText.value.trim()) {
-      translate(sourceText.value, props.sourceLang, props.targetLang, props.style);
+      runTranslate(sourceText.value);
     }
   }
 );
